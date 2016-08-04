@@ -87,55 +87,55 @@ export default Controller.extend(SettingsMenuMixin, {
         this.set('lastPromise', promise);
     },
 
-    metaTitleScratch: boundOneWay('model.metaTitle'),
-    metaDescriptionScratch: boundOneWay('model.metaDescription'),
+    // metaTitleScratch: boundOneWay('model.metaTitle'),
+    // metaDescriptionScratch: boundOneWay('model.metaDescription'),
 
-    seoTitle: computed('model.titleScratch', 'metaTitleScratch', function () {
-        let metaTitle = this.get('metaTitleScratch') || '';
+    // seoTitle: computed('model.metaTitle', 'metaTitle', function () {
+    //     let metaTitle = this.get('metaTitle') || '';
 
-        metaTitle = metaTitle.length > 0 ? metaTitle : this.get('model.titleScratch');
+    //     metaTitle = metaTitle.length > 0 ? metaTitle : this.get('model.metaTitle');
 
-        if (metaTitle.length > 70) {
-            metaTitle = metaTitle.substring(0, 70).trim();
-            metaTitle = Handlebars.Utils.escapeExpression(metaTitle);
-            metaTitle = htmlSafe(`${metaTitle}&hellip;`);
-        }
+    //     if (metaTitle.length > 70) {
+    //         metaTitle = metaTitle.substring(0, 70).trim();
+    //         metaTitle = Handlebars.Utils.escapeExpression(metaTitle);
+    //         metaTitle = htmlSafe(`${metaTitle}&hellip;`);
+    //     }
 
-        return metaTitle;
-    }),
+    //     return metaTitle;
+    // }),
 
-    seoDescription: computed('model.scratch', 'metaDescriptionScratch', function () {
-        let metaDescription = this.get('metaDescriptionScratch') || '';
-        let html = '';
-        let el, placeholder;
+    // seoDescription: computed('model.metaDescription', 'metaDescription', function () {
+    //     let metaDescription = this.get('metaDescriptionScratch') || '';
+    //     let html = '';
+    //     let el, placeholder;
 
-        if (metaDescription.length > 0) {
-            placeholder = metaDescription;
-        } else {
-            el = $('.rendered-markdown');
+    //     if (metaDescription.length > 0) {
+    //         placeholder = metaDescription;
+    //     } else {
+    //         el = $('.rendered-markdown');
 
-            // Get rendered markdown
-            if (el !== undefined && el.length > 0) {
-                html = el.clone();
-                html.find('.js-drop-zone').remove();
-                html = html[0].innerHTML;
-            }
+    //         // Get rendered markdown
+    //         if (el !== undefined && el.length > 0) {
+    //             html = el.clone();
+    //             html.find('.js-drop-zone').remove();
+    //             html = html[0].innerHTML;
+    //         }
 
-            // Strip HTML
-            placeholder = $('<div />', {html}).text();
-            // Replace new lines and trim
-            placeholder = placeholder.replace(/\n+/g, ' ').trim();
-        }
+    //         // Strip HTML
+    //         placeholder = $('<div />', {html}).text();
+    //         // Replace new lines and trim
+    //         placeholder = placeholder.replace(/\n+/g, ' ').trim();
+    //     }
 
-        if (placeholder.length > 156) {
-            // Limit to 156 characters
-            placeholder = placeholder.substring(0, 156).trim();
-            placeholder = Handlebars.Utils.escapeExpression(placeholder);
-            placeholder = htmlSafe(`${placeholder}&hellip;`);
-        }
+    //     if (placeholder.length > 156) {
+    //         // Limit to 156 characters
+    //         placeholder = placeholder.substring(0, 156).trim();
+    //         placeholder = Handlebars.Utils.escapeExpression(placeholder);
+    //         placeholder = htmlSafe(`${placeholder}&hellip;`);
+    //     }
 
-        return placeholder;
-    }),
+    //     return placeholder;
+    // }),
 
     seoURL: computed('model.slug', 'config.blogUrl', function () {
         let blogUrl = this.get('config.blogUrl');
@@ -376,45 +376,55 @@ export default Controller.extend(SettingsMenuMixin, {
         },
 
         setMetaTitle(metaTitle) {
-            let property = 'metaTitle';
-            let model = this.get('model');
-            let currentTitle = model.get(property) || '';
+            // let property = 'metaTitle';
+            // let model = this.get('model');
+            // let currentTitle = model.get(property) || '';
+            // console.log(currentTitle);
+            // console.log(metaTitle);
 
-            // Only update if the title has changed
-            if (currentTitle === metaTitle) {
-                return;
-            }
+            // // Only update if the title has changed
+            // // if (currentTitle === metaTitle) {
+            // //     return;
+            // // }
 
-            model.set(property, metaTitle);
+            // model.set(property, metaTitle);
+            // console.log('here ' + model.get(property));
 
-            // If this is a new post.  Don't save the model.  Defer the save
-            // to the user pressing the save button
-            if (model.get('isNew')) {
-                return;
-            }
+            // // If this is a new post.  Don't save the model.  Defer the save
+            // // to the user pressing the save button
+            // if (model.get('isNew')) {
+            //     return;
+            // }
 
-            model.save();
+            // model.save();
+
+            this.set('model.metaTitle', metaTitle);
+
+            this.get('model').save();
         },
 
         setMetaDescription(metaDescription) {
-            let property = 'metaDescription';
-            let model = this.get('model');
-            let currentDescription = model.get(property) || '';
+            // let property = 'metaDescription';
+            // let model = this.get('model');
+            // let currentDescription = model.get(property) || '';
 
-            // Only update if the description has changed
-            if (currentDescription === metaDescription) {
-                return;
-            }
+            // // Only update if the description has changed
+            // if (currentDescription === metaDescription) {
+            //     return;
+            // }
 
-            model.set(property, metaDescription);
+            // model.set(property, metaDescription);
 
-            // If this is a new post.  Don't save the model.  Defer the save
-            // to the user pressing the save button
-            if (model.get('isNew')) {
-                return;
-            }
+            // // If this is a new post.  Don't save the model.  Defer the save
+            // // to the user pressing the save button
+            // if (model.get('isNew')) {
+            //     return;
+            // }
 
-            model.save();
+            // model.save();
+            this.set('model.metaDescription', metaDescription);
+
+            this.get('model').save();
         },
 
         setCoverImage(image) {

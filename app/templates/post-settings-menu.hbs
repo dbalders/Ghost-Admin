@@ -121,15 +121,15 @@
             <form {{action "discardEnter" on="submit"}}>
             {{#gh-form-group errors=model.errors property="metaTitle"}}
                 <label for="meta-title">Meta Title</label>
-                {{gh-input metaTitleScratch class="post-setting-meta-title" id="meta-title" name="post-setting-meta-title" focusOut=(action "setMetaTitle" metaTitleScratch) stopEnterKeyDownPropagation="true" update=(action (mut metaTitleScratch))}}
-                <p>Recommended: <b>70</b> characters. You’ve used {{gh-count-down-characters metaTitleScratch 70}}</p>
+                {{gh-input model.metaTitle class="post-setting-meta-title" id="meta-title" name="post-setting-meta-title" focusOut=(action "setMetaTitle" model.metaTitle) stopEnterKeyDownPropagation="true" update=(action (mut model.metaTitle))}}
+                <p>Recommended: <b>70</b> characters. You’ve used {{gh-count-down-characters model.metaTitle 70}}</p>
                 {{gh-error-message errors=model.errors property="metaTitle"}}
             {{/gh-form-group}}
 
             {{#gh-form-group errors=model.errors property="metaDescription"}}
                 <label for="meta-description">Meta Description</label>
-                {{gh-textarea metaDescriptionScratch class="post-setting-meta-description" id="meta-description" name="post-setting-meta-description" focusOut=(action "setMetaDescription" metaDescriptionScratch) stopEnterKeyDownPropagation="true" update=(action (mut metaDescriptionScratch))}}
-                <p>Recommended: <b>156</b> characters. You’ve used {{gh-count-down-characters metaDescriptionScratch 156}}</p>
+                {{gh-textarea model.metaDescription class="post-setting-meta-description" id="meta-description" name="post-setting-meta-description" focusOut=(action "setMetaDescription" model.metaDescription) stopEnterKeyDownPropagation="true" update=(action (mut model.metaDescription))}}
+                <p>Recommended: <b>156</b> characters. You’ve used {{gh-count-down-characters model.metaDescription 156}}</p>
                 {{gh-error-message errors=model.errors property="metaDescription"}}
             {{/gh-form-group}}
 
