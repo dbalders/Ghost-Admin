@@ -1,16 +1,20 @@
 import Ember from 'ember';
 import Mixin from 'ember-metal/mixin';
 import RSVP from 'rsvp';
-import computed, {alias} from 'ember-computed';
+import computed, {alias, mapBy} from 'ember-computed';
 import injectService from 'ember-service/inject';
 import injectController from 'ember-controller/inject';
 import {htmlSafe} from 'ember-string';
 import observer from 'ember-metal/observer';
 import run from 'ember-runloop';
 import {isEmberArray} from 'ember-array/utils';
+import {isBlank} from 'ember-utils';
+
+import {task, timeout} from 'ember-concurrency';
 
 import PostModel from 'ghost-admin/models/post';
 import boundOneWay from 'ghost-admin/utils/bound-one-way';
+import {isVersionMismatchError} from 'ghost-admin/services/ajax';
 
 const {resolve} = RSVP;
 
@@ -33,6 +37,7 @@ export default Mixin.create({
     postSettingsMenuController: injectController('post-settings-menu'),
     notifications: injectService(),
     clock: injectService(),
+    slugGenerator: injectService(),
 
     init() {
         this._super(...arguments);
@@ -77,9 +82,7 @@ export default Mixin.create({
     // whether the number of tags has changed for `hasDirtyAttributes`.
     previousTagNames: null,
 
-    tagNames: computed('model.tags.@each.name', function () {
-        return this.get('model.tags').mapBy('name');
-    }),
+    tagNames: mapBy('model.tags', 'name'),
 
     postOrPage: computed('model.page', function () {
         return this.get('model.page') ? 'Page' : 'Post';
@@ -125,8 +128,8 @@ export default Mixin.create({
 
     // compares previousTagNames to tagNames
     tagNamesEqual() {
-        let tagNames = this.get('tagNames');
-        let previousTagNames = this.get('previousTagNames');
+        let tagNames = this.get('tagNames') || [];
+        let previousTagNames = this.get('previousTagNames') || [];
         let hashCurrent,
             hashPrevious;
 
@@ -326,6 +329,45 @@ export default Mixin.create({
         notifications.showAlert(message, {type: 'error', delayed: delay, key: 'post.save'});
     },
 
+    updateTitle: task(function* (newTitle) {
+        this.set('model.titleScratch', newTitle);
+
+        // if model is not new and title is not '(Untitled)', or model is new and
+        // has a title, don't generate a slug
+        if ((!this.get('model.isNew') || this.get('model.title')) && newTitle !== '(Untitled)') {
+            return;
+        }
+
+        // debounce for 700 milliseconds
+        yield timeout(700);
+
+        yield this.get('generateSlug').perform();
+    }).restartable(),
+
+    generateSlug: task(function* () {
+        let title = this.get('model.titleScratch');
+
+        // Only set an "untitled" slug once per post
+        if (title === '(Untitled)' && this.get('model.slug')) {
+            return;
+        }
+
+        try {
+            let slug = yield this.get('slugGenerator').generateSlug('post', title);
+
+            if (!isBlank(slug)) {
+                this.set('model.slug', slug);
+            }
+        } catch (error) {
+            // Nothing to do (would be nice to log this somewhere though),
+            // but a rejected promise needs to be handled here so that a resolved
+            // promise is returned.
+            if (isVersionMismatchError(error)) {
+                this.get('notifications').showAPIError(error);
+            }
+        }
+    }).enqueue(),
+
     actions: {
         cancelTimers() {
             let autoSaveId = this._autoSaveId;
@@ -384,14 +426,12 @@ export default Mixin.create({
             this.set('model.metaDescription', psmController.get('metaDescriptionScratch'));
 
             if (!this.get('model.slug')) {
-                // Cancel any pending slug generation that may still be queued in the
-                // run loop because we need to run it before the post is saved.
-                run.cancel(psmController.get('debounceId'));
+                this.get('updateTitle').cancelAll();
 
-                psmController.generateAndSetSlug('model.slug');
+                promise = this.get('generateSlug').perform();
             }
 
-            promise = resolve(psmController.get('lastPromise')).then(() => {
+            return resolve(promise).then(() => {
                 return this.get('model').save(options).then((model) => {
                     if (!options.silent) {
                         this.showSaveNotification(prevStatus, model.get('status'), isNew ? true : false);
@@ -426,10 +466,6 @@ export default Mixin.create({
                 this.toggleProperty('submitting');
                 return this.get('model');
             });
-
-            psmController.set('lastPromise', promise);
-
-            return promise;
         },
 
         setSaveType(newType) {
