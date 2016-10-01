@@ -3,6 +3,7 @@ import computed from 'ember-computed';
 import injectService from 'ember-service/inject';
 import {htmlSafe} from 'ember-string';
 import {isBlank} from 'ember-utils';
+import {isEmberArray} from 'ember-array/utils';
 import run from 'ember-runloop';
 
 import {invokeAction} from 'ember-invoke-action';
@@ -10,7 +11,8 @@ import ghostPaths from 'ghost-admin/utils/ghost-paths';
 import {
     isRequestEntityTooLargeError,
     isUnsupportedMediaTypeError,
-    isVersionMismatchError
+    isVersionMismatchError,
+    UnsupportedMediaTypeError
 } from 'ghost-admin/services/ajax';
 
 export default Component.extend({
@@ -22,6 +24,9 @@ export default Component.extend({
     text: '',
     altText: '',
     saveButton: true,
+    accept: 'image/gif,image/jpg,image/jpeg,image/png,image/svg+xml',
+    extensions: ['gif', 'jpg', 'jpeg', 'png', 'svg'],
+    validate: null,
 
     dragClass: null,
     failureMessage: null,
@@ -96,7 +101,7 @@ export default Component.extend({
         event.preventDefault();
 
         if (showUploadForm) {
-            this.set('dragClass', '--drag-over');
+            this.set('dragClass', '-drag-over');
         }
     },
 
@@ -200,12 +205,48 @@ export default Component.extend({
         });
     },
 
+    _validate(file) {
+        if (this.get('validate')) {
+            return invokeAction(this, 'validate', file);
+        } else {
+            return this._defaultValidator(file);
+        }
+    },
+
+    _defaultValidator(file) {
+        let extensions = this.get('extensions');
+        let [, extension] = (/(?:\.([^.]+))?$/).exec(file.name);
+
+        if (!isEmberArray(extensions)) {
+            extensions = extensions.split(',');
+        }
+
+        if (!extension || extensions.indexOf(extension.toLowerCase()) === -1) {
+            return new UnsupportedMediaTypeError();
+        }
+
+        return true;
+    },
+
     actions: {
         fileSelected(fileList) {
-            this.set('file', fileList[0]);
-            run.schedule('actions', this, function () {
-                this.generateRequest();
-            });
+            // can't use array destructuring here as FileList is not a strict
+            // array and fails in Safari
+            // jscs:disable requireArrayDestructuring
+            let file = fileList[0];
+            // jscs:enable requireArrayDestructuring
+            let validationResult = this._validate(file);
+
+            this.set('file', file);
+            invokeAction(this, 'fileSelected', file);
+
+            if (validationResult === true) {
+                run.schedule('actions', this, function () {
+                    this.generateRequest();
+                });
+            } else {
+                this._uploadFailed(validationResult);
+            }
         },
 
         onInput(url) {

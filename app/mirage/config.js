@@ -1,10 +1,12 @@
 import mockAuthentication from './config/authentication';
+import mockInvites from './config/invites';
 import mockPosts from './config/posts';
 import mockRoles from './config/roles';
 import mockSettings from './config/settings';
 import mockSlugs from './config/slugs';
 import mockSubscribers from './config/subscribers';
 import mockTags from './config/tags';
+import mockThemes from './config/themes';
 import mockUsers from './config/users';
 
 // import {versionMismatchResponse} from 'utils';
@@ -17,6 +19,10 @@ export default function () {
     // Mock endpoints here to override real API requests during development
     // this.put('/posts/:id/', versionMismatchResponse);
     // mockSubscribers(this);
+    this.loadFixtures('settings');
+    mockInvites(this);
+    mockSettings(this);
+    mockThemes(this);
 
     // keep this line, it allows all other API requests to hit the real server
     this.passthrough();
@@ -34,12 +40,14 @@ export function testConfig() {
     // this.logging = true;
 
     mockAuthentication(this);
+    mockInvites(this);
     mockPosts(this);
     mockRoles(this);
     mockSettings(this);
     mockSlugs(this);
     mockSubscribers(this);
     mockTags(this);
+    mockThemes(this);
     mockUsers(this);
 
     /* Notifications -------------------------------------------------------- */

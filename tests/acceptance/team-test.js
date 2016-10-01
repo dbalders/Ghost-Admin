@@ -61,12 +61,12 @@ describe('Acceptance: Team', function () {
         });
     });
 
-    describe('when logged in', function () {
-        let admin;
+    describe('when logged in as admin', function () {
+        let admin, adminRole;
 
         beforeEach(function () {
-            let role = server.create('role', {name: 'Admininstrator'});
-            admin = server.create('user', {roles: [role]});
+            adminRole = server.create('role', {name: 'Administrator'});
+            admin = server.create('user', {email: 'admin@example.com', roles: [adminRole]});
 
             server.loadFixtures();
 
@@ -113,127 +113,302 @@ describe('Acceptance: Team', function () {
             });
         });
 
-        describe('invite new user', function () {
+        it('can manage invites', function () {
             let emailInputField = '.fullscreen-modal input[name="email"]';
 
-            // @TODO: Evaluate after the modal PR goes in
-            it('modal loads correctly', function () {
-                visit('/team');
+            visit('/team');
 
-                andThen(() => {
-                    // url is correct
-                    expect(currentURL(), 'currentURL').to.equal('/team');
+            andThen(() => {
+                // invite user button exists
+                expect(
+                    find('.view-actions .btn-green').text().trim(),
+                    'invite people button text'
+                ).to.equal('Invite People');
 
-                    // invite user button exists
-                    expect(find('.view-actions .btn-green').html(), 'invite people button text')
-                        .to.equal('Invite People');
-                });
+                // existing users are listed
+                expect(
+                    find('.user-list.active-users .user-list-item').length,
+                    'initial number of active users'
+                ).to.equal(1);
 
-                click('.view-actions .btn-green');
+                expect(
+                    find('.user-list.active-users .user-list-item:first-of-type .role-label').text().trim(),
+                    'active user\'s role label'
+                ).to.equal('Administrator');
 
-                andThen(() => {
-                    let roleOptions = find('#new-user-role select option');
-
-                    function checkOwnerExists() {
-                        for (let i in roleOptions) {
-                            if (roleOptions[i].tagName === 'option' && roleOptions[i].text === 'Owner') {
-                                return true;
-                            }
-                        }
-                        return false;
-                    }
-
-                    function checkSelectedIsAuthor() {
-                        for (let i in roleOptions) {
-                            if (roleOptions[i].selected) {
-                                return roleOptions[i].text === 'Author';
-                            }
-                        }
-                        return false;
-                    }
-
-                    // should be 3 available roles
-                    expect(roleOptions.length, 'number of available roles').to.equal(3);
-
-                    expect(checkOwnerExists(), 'owner role isn\'t available').to.be.false;
-                    expect(checkSelectedIsAuthor(), 'author role is selected initially').to.be.true;
-                });
+                // no invites are shown
+                expect(
+                    find('.user-list.invited-users .user-list-item').length,
+                    'initial number of invited users'
+                ).to.equal(0);
             });
 
-            it('sends an invite correctly', function () {
-                visit('/team');
+            // click the invite people button
+            click('.view-actions .btn-green');
 
-                andThen(() => {
-                    expect(find('.user-list.invited-users .user-list-item').length, 'number of invited users').to.equal(0);
-                });
+            andThen(() => {
+                let roleOptions = find('.fullscreen-modal select[name="role"] option');
 
-                click('.view-actions .btn-green');
-                click(emailInputField);
-                triggerEvent(emailInputField, 'blur');
+                function checkOwnerExists() {
+                    for (let i in roleOptions) {
+                        if (roleOptions[i].tagName === 'option' && roleOptions[i].text === 'Owner') {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
 
-                andThen(() => {
-                    expect(find('.modal-body .form-group:first').hasClass('error'), 'email input has error status').to.be.true;
-                    expect(find('.modal-body .form-group:first .response').text()).to.contain('Please enter an email.');
-                });
+                function checkSelectedIsAuthor() {
+                    for (let i in roleOptions) {
+                        if (roleOptions[i].selected) {
+                            return roleOptions[i].text === 'Author';
+                        }
+                    }
+                    return false;
+                }
 
-                fillIn(emailInputField, 'test@example.com');
-                click('.fullscreen-modal .btn-green');
+                // modal is displayed
+                expect(
+                    find('.fullscreen-modal h1').text().trim(),
+                    'correct modal is displayed'
+                ).to.equal('Invite a New User');
 
-                andThen(() => {
-                    expect(find('.user-list.invited-users .user-list-item').length, 'number of invited users').to.equal(1);
-                    expect(find('.user-list.invited-users .user-list-item:first .name').text(), 'name of invited user').to.equal('test@example.com');
-                });
+                // number of roles is correct
+                expect(
+                    find('.fullscreen-modal select[name="role"] option').length,
+                    'number of selectable roles'
+                ).to.equal(3);
 
-                click('.user-list.invited-users .user-list-item:first .user-list-item-aside .user-list-action:contains("Revoke")');
-
-                andThen(() => {
-                    expect(find('.user-list.invited-users .user-list-item').length, 'number of invited users').to.equal(0);
-                });
+                expect(checkOwnerExists(), 'owner role isn\'t available').to.be.false;
+                expect(checkSelectedIsAuthor(), 'author role is selected initially').to.be.true;
             });
 
-            it('fails sending an invite correctly', function () {
-                server.create('user', {email: 'test1@example.com'});
-                server.create('user', {email: 'test2@example.com', status: 'invited'});
+            // submit valid invite form
+            fillIn('.fullscreen-modal input[name="email"]', 'invite1@example.com');
+            click('.fullscreen-modal .btn-green');
 
-                visit('/team');
+            andThen(() => {
+                // modal closes
+                expect(
+                    find('.fullscreen-modal').length,
+                    'number of modals after sending invite'
+                ).to.equal(0);
 
-                // check our users lists are what we expect
-                andThen(() => {
-                    expect(find('.user-list.invited-users .user-list-item').length, 'number of invited users')
-                        .to.equal(1);
-                    // number of active users is 2 because of the logged-in user
-                    expect(find('.user-list.active-users .user-list-item').length, 'number of active users')
-                        .to.equal(2);
-                });
+                // invite is displayed, has correct e-mail + role
+                expect(
+                    find('.invited-users .user-list-item').length,
+                    'number of invites after first invite'
+                ).to.equal(1);
 
-                // click the "invite new user" button to open the modal
-                click('.view-actions .btn-green');
+                expect(
+                    find('.invited-users span.name').first().text().trim(),
+                    'displayed email of first invite'
+                ).to.equal('invite1@example.com');
 
-                // fill in and submit the invite user modal with an existing user
-                fillIn(emailInputField, 'test1@example.com');
-                click('.fullscreen-modal .btn-green');
+                expect(
+                    find('.invited-users span.role-label').first().text().trim(),
+                    'displayed role of first invite'
+                ).to.equal('Author');
 
-                andThen(() => {
-                    // check the inline-validation
-                    expect(find('.fullscreen-modal .error .response').text().trim(), 'inviting existing user error')
-                        .to.equal('A user with that email address already exists.');
-                });
+                // number of users is unchanged
+                expect(
+                    find('.active-users .user-list-item').length,
+                    'number of active users after first invite'
+                ).to.equal(1);
+            });
 
-                // fill in and submit the invite user modal with an invited user
-                fillIn(emailInputField, 'test2@example.com');
-                click('.fullscreen-modal .btn-green');
+            // submit new invite with different role
+            click('.view-actions .btn-green');
+            fillIn('.fullscreen-modal input[name="email"]', 'invite2@example.com');
+            fillIn('.fullscreen-modal select[name="role"]', '2');
+            click('.fullscreen-modal .btn-green');
 
-                andThen(() => {
-                    // check the inline-validation
-                    expect(find('.fullscreen-modal .error .response').text().trim(), 'inviting invited user error')
-                        .to.equal('A user with that email address was already invited.');
+            andThen(() => {
+                // number of invites increases
+                expect(
+                    find('.invited-users .user-list-item').length,
+                    'number of invites after second invite'
+                ).to.equal(2);
 
-                    // ensure that there's been no change in our user lists
-                    expect(find('.user-list.invited-users .user-list-item').length, 'number of invited users after failed invites')
-                        .to.equal(1);
-                    expect(find('.user-list.active-users .user-list-item').length, 'number of active users after failed invites')
-                        .to.equal(2);
-                });
+                // invite has correct e-mail + role
+                expect(
+                    find('.invited-users span.name').last().text().trim(),
+                    'displayed email of second invite'
+                ).to.equal('invite2@example.com');
+
+                expect(
+                    find('.invited-users span.role-label').last().text().trim(),
+                    'displayed role of second invite'
+                ).to.equal('Editor');
+            });
+
+            // submit invite form with existing user
+            click('.view-actions .btn-green');
+            fillIn('.fullscreen-modal input[name="email"]', 'admin@example.com');
+            click('.fullscreen-modal .btn-green');
+
+            andThen(() => {
+                // validation message is displayed
+                expect(
+                    find('.fullscreen-modal .error .response').text().trim(),
+                    'inviting existing user error'
+                ).to.equal('A user with that email address already exists.');
+            });
+
+            // submit invite form with existing invite
+            fillIn('.fullscreen-modal input[name="email"]', 'invite1@example.com');
+            click('.fullscreen-modal .btn-green');
+
+            andThen(() => {
+                // validation message is displayed
+                expect(
+                    find('.fullscreen-modal .error .response').text().trim(),
+                    'inviting invited user error'
+                ).to.equal('A user with that email address was already invited.');
+            });
+
+            // submit invite form with an invalid email
+            fillIn('.fullscreen-modal input[name="email"]', 'test');
+            click('.fullscreen-modal .btn-green');
+
+            andThen(() => {
+                // validation message is displayed
+                expect(
+                    find('.fullscreen-modal .error .response').text().trim(),
+                    'inviting invalid email error'
+                ).to.equal('Invalid Email.');
+            });
+
+            click('.fullscreen-modal a.close');
+            // revoke latest invite
+            click('.invited-users .user-list-item:last-of-type a[href="#revoke"]');
+
+            andThen(() => {
+                // number of invites decreases
+                expect(
+                    find('.invited-users .user-list-item').length,
+                    'number of invites after revoke'
+                ).to.equal(1);
+
+                // notification is displayed
+                expect(
+                    find('.gh-notification').text().trim(),
+                    'notifications contain revoke'
+                ).to.match(/Invitation revoked\. \(invite2@example\.com\)/);
+
+                // correct invite is removed
+                expect(
+                    find('.invited-users span.name').text().trim(),
+                    'displayed email of remaining invite'
+                ).to.equal('invite1@example.com');
+            });
+
+            // add another invite to test ordering on resend
+            click('.view-actions .btn-green');
+            fillIn('.fullscreen-modal input[name="email"]', 'invite3@example.com');
+            click('.fullscreen-modal .btn-green');
+
+            andThen(() => {
+                // new invite should be last in the list
+                expect(
+                    find('.invited-users span.name').last().text().trim(),
+                    'last invite email in list'
+                ).to.equal('invite3@example.com');
+            });
+
+            // resend first invite
+            click('.invited-users .user-list-item:first-of-type a[href="#resend"]');
+
+            andThen(() => {
+                // notification is displayed
+                expect(
+                    find('.gh-notification').text().trim(),
+                    'notifications contain resend'
+                ).to.match(/Invitation resent! \(invite1@example\.com\)/);
+
+                // first invite is still at the top
+                expect(
+                    find('.invited-users span.name').first().text().trim(),
+                    'first invite email in list'
+                ).to.equal('invite1@example.com');
+            });
+
+            // regression test: can revoke a resent invite
+            click('.invited-users .user-list-item:first-of-type a[href="#resend"]');
+            click('.invited-users .user-list-item:first-of-type a[href="#revoke"]');
+
+            andThen(() => {
+                // number of invites decreases
+                expect(
+                    find('.invited-users .user-list-item').length,
+                    'number of invites after resend/revoke'
+                ).to.equal(1);
+
+                // notification is displayed
+                expect(
+                    find('.gh-notification').text().trim(),
+                    'notifications contain revoke after resend/revoke'
+                ).to.match(/Invitation revoked\. \(invite1@example\.com\)/);
+            });
+        });
+
+        it('can delete users', function () {
+            /* jscs:disable requireCamelCaseOrUpperCaseIdentifiers */
+            let user1 = server.create('user');
+            let user2 = server.create('user');
+            let post1 = server.create('post', {author_id: user2.id});
+            /* jscs:disable requireCamelCaseOrUpperCaseIdentifiers */
+
+            visit('/team');
+            click(`a.user-list-item:contains("${user1.name}")`);
+
+            // user deletion displays modal
+            click('button.delete');
+            andThen(() => {
+                expect(
+                    find('.fullscreen-modal .modal-content:contains("delete this user")').length,
+                    'user deletion modal displayed after button click'
+                ).to.equal(1);
+
+                // user has no posts so no warning about post deletion
+                expect(
+                    find('.fullscreen-modal .modal-content:contains("is the author of")').length,
+                    'deleting user with no posts has no post count'
+                ).to.equal(0);
+            });
+
+            // cancelling user deletion closes modal
+            click('.fullscreen-modal button:contains("Cancel")');
+            andThen(() => {
+                expect(
+                    find('.fullscreen-modal').length === 0,
+                    'delete user modal is closed when cancelling'
+                ).to.be.true;
+            });
+
+            // deleting a user with posts
+            visit('/team');
+            click(`a.user-list-item:contains("${user2.name}")`);
+
+            click('button.delete');
+            andThen(() => {
+                // user has  posts so should warn about post deletion
+                expect(
+                    find('.fullscreen-modal .modal-content:contains("is the author of 1 post")').length,
+                    'deleting user with posts has post count'
+                ).to.equal(1);
+            });
+
+            click('.fullscreen-modal button:contains("Delete")');
+            andThen(() => {
+                // redirected to team page
+                expect(currentURL()).to.equal('/team');
+
+                // deleted user is not in list
+                expect(
+                    find(`.user-list-item .name:contains("${user2.name}")`).length,
+                    'deleted user is not in user list after deletion'
+                ).to.equal(0);
             });
         });
 
@@ -309,7 +484,7 @@ describe('Acceptance: Team', function () {
                 triggerEvent('#user-location', 'blur');
 
                 andThen(() => {
-                    expect(find('.user-details-bottom .form-group:nth-of-type(3)').hasClass('error'), 'location input should be in error state').to.be.true;
+                    expect(find('#user-location').closest('.form-group').hasClass('error'), 'location input should be in error state').to.be.true;
                 });
 
                 fillIn('#user-location', '');
@@ -317,7 +492,7 @@ describe('Acceptance: Team', function () {
                 triggerEvent('#user-website', 'blur');
 
                 andThen(() => {
-                    expect(find('.user-details-bottom .form-group:nth-of-type(4)').hasClass('error'), 'website input should be in error state').to.be.true;
+                    expect(find('#user-website').closest('.form-group').hasClass('error'), 'website input should be in error state').to.be.true;
                 });
 
                 // Testing Facebook input
@@ -343,7 +518,7 @@ describe('Acceptance: Team', function () {
                 triggerEvent('#user-facebook', 'blur');
 
                 andThen(() => {
-                    expect(find('.user-details-bottom .form-group:nth-of-type(5)').hasClass('error'), 'facebook input should be in error state').to.be.true;
+                    expect(find('#user-facebook').closest('.form-group').hasClass('error'), 'facebook input should be in error state').to.be.true;
                 });
 
                 fillIn('#user-facebook', '');
@@ -352,7 +527,7 @@ describe('Acceptance: Team', function () {
 
                 andThen(() => {
                     expect(find('#user-facebook').val()).to.be.equal('https://www.facebook.com/pages/)(*&%^%)');
-                    expect(find('.user-details-bottom .form-group:nth-of-type(5)').hasClass('error'), 'facebook input should be in error state').to.be.false;
+                    expect(find('#user-facebook').closest('.form-group').hasClass('error'), 'facebook input should be in error state').to.be.false;
                 });
 
                 fillIn('#user-facebook', '');
@@ -361,7 +536,7 @@ describe('Acceptance: Team', function () {
 
                 andThen(() => {
                     expect(find('#user-facebook').val()).to.be.equal('https://www.facebook.com/testing');
-                    expect(find('.user-details-bottom .form-group:nth-of-type(5)').hasClass('error'), 'facebook input should be in error state').to.be.false;
+                    expect(find('#user-facebook').closest('.form-group').hasClass('error'), 'facebook input should be in error state').to.be.false;
                 });
 
                 fillIn('#user-facebook', '');
@@ -370,7 +545,7 @@ describe('Acceptance: Team', function () {
 
                 andThen(() => {
                     expect(find('#user-facebook').val()).to.be.equal('https://www.facebook.com/pages/some-facebook-page/857469375913?ref=ts');
-                    expect(find('.user-details-bottom .form-group:nth-of-type(5)').hasClass('error'), 'facebook input should be in error state').to.be.false;
+                    expect(find('#user-facebook').closest('.form-group').hasClass('error'), 'facebook input should be in error state').to.be.false;
                 });
 
                 fillIn('#user-facebook', '');
@@ -378,7 +553,7 @@ describe('Acceptance: Team', function () {
                 triggerEvent('#user-facebook', 'blur');
 
                 andThen(() => {
-                    expect(find('.user-details-bottom .form-group:nth-of-type(5)').hasClass('error'), 'facebook input should be in error state').to.be.true;
+                    expect(find('#user-facebook').closest('.form-group').hasClass('error'), 'facebook input should be in error state').to.be.true;
                 });
 
                 fillIn('#user-facebook', '');
@@ -387,7 +562,7 @@ describe('Acceptance: Team', function () {
 
                 andThen(() => {
                     expect(find('#user-facebook').val()).to.be.equal('https://www.facebook.com/testuser');
-                    expect(find('.user-details-bottom .form-group:nth-of-type(5)').hasClass('error'), 'facebook input should be in error state').to.be.false;
+                    expect(find('#user-facebook').closest('.form-group').hasClass('error'), 'facebook input should be in error state').to.be.false;
                 });
 
                 fillIn('#user-facebook', '');
@@ -396,7 +571,7 @@ describe('Acceptance: Team', function () {
 
                 andThen(() => {
                     expect(find('#user-facebook').val()).to.be.equal('https://www.facebook.com/testing');
-                    expect(find('.user-details-bottom .form-group:nth-of-type(5)').hasClass('error'), 'facebook input should be in error state').to.be.false;
+                    expect(find('#user-facebook').closest('.form-group').hasClass('error'), 'facebook input should be in error state').to.be.false;
                 });
 
                 // Testing Twitter input
@@ -422,7 +597,7 @@ describe('Acceptance: Team', function () {
                 triggerEvent('#user-twitter', 'blur');
 
                 andThen(() => {
-                    expect(find('.user-details-bottom .form-group:nth-of-type(6)').hasClass('error'), 'twitter input should be in error state').to.be.true;
+                    expect(find('#user-twitter').closest('.form-group').hasClass('error'), 'twitter input should be in error state').to.be.true;
                 });
 
                 fillIn('#user-twitter', '');
@@ -431,7 +606,7 @@ describe('Acceptance: Team', function () {
 
                 andThen(() => {
                     expect(find('#user-twitter').val()).to.be.equal('https://twitter.com/name');
-                    expect(find('.user-details-bottom .form-group:nth-of-type(6)').hasClass('error'), 'twitter input should be in error state').to.be.false;
+                    expect(find('#user-twitter').closest('.form-group').hasClass('error'), 'twitter input should be in error state').to.be.false;
                 });
 
                 fillIn('#user-twitter', '');
@@ -440,7 +615,7 @@ describe('Acceptance: Team', function () {
 
                 andThen(() => {
                     expect(find('#user-twitter').val()).to.be.equal('https://twitter.com/user');
-                    expect(find('.user-details-bottom .form-group:nth-of-type(6)').hasClass('error'), 'twitter input should be in error state').to.be.false;
+                    expect(find('#user-twitter').closest('.form-group').hasClass('error'), 'twitter input should be in error state').to.be.false;
                 });
 
                 fillIn('#user-twitter', '');
@@ -449,7 +624,7 @@ describe('Acceptance: Team', function () {
 
                 andThen(() => {
                     expect(find('#user-twitter').val()).to.be.equal('https://twitter.com/user');
-                    expect(find('.user-details-bottom .form-group:nth-of-type(6)').hasClass('error'), 'twitter input should be in error state').to.be.false;
+                    expect(find('#user-twitter').closest('.form-group').hasClass('error'), 'twitter input should be in error state').to.be.false;
                 });
 
                 fillIn('#user-website', '');
@@ -457,7 +632,7 @@ describe('Acceptance: Team', function () {
                 triggerEvent('#user-bio', 'blur');
 
                 andThen(() => {
-                    expect(find('.user-details-bottom .form-group:nth-of-type(7)').hasClass('error'), 'bio input should be in error state').to.be.true;
+                    expect(find('#user-bio').closest('.form-group').hasClass('error'), 'bio input should be in error state').to.be.true;
                 });
 
                 // password reset ------
@@ -510,7 +685,7 @@ describe('Acceptance: Team', function () {
                 andThen(() => {
                     // hits the endpoint
                     let [lastRequest] = server.pretender.handledRequests.slice(-1);
-                    let params = $.deparam(lastRequest.requestBody);
+                    let params = JSON.parse(lastRequest.requestBody);
 
                     expect(lastRequest.url, 'password request URL')
                         .to.match(/\/users\/password/);
@@ -537,6 +712,44 @@ describe('Acceptance: Team', function () {
                         find('.gh-notifications .gh-notification').length,
                         'password saved notification is displayed'
                     ).to.equal(1);
+                });
+            });
+        });
+
+        describe('using Ghost OAuth', function () {
+            beforeEach(function () {
+                // simulate active oauth config
+                $('head').append('<meta name="env-ghostAuthId" content="6e0704b3-c653-4c12-8da7-584232b5c629" />');
+
+                server.loadFixtures();
+            });
+
+            afterEach(function () {
+                // ensure we don't leak OAuth config to other tests
+                $('meta[name="env-ghostAuthId"]').remove();
+            });
+
+            it('doesn\'t show the password reset form', function () {
+                visit(`/team/${admin.slug}`);
+
+                andThen(() => {
+                    // ensure that the normal form is displayed so we don't get
+                    // false positives
+                    expect(
+                        find('input#user-slug').length,
+                        'profile form is displayed'
+                    ).to.equal(1);
+
+                    // check that the password form is hidden
+                    expect(
+                        find('#password-reset').length,
+                        'presence of password reset form'
+                    ).to.equal(0);
+
+                    expect(
+                        find('#user-password-new').length,
+                        'presence of new password field'
+                    ).to.equal(0);
                 });
             });
         });
@@ -589,7 +802,7 @@ describe('Acceptance: Team', function () {
             });
         });
 
-        it('redirects to 404 when tag does not exist', function () {
+        it('redirects to 404 when user does not exist', function () {
             server.get('/users/slug/unknown/', function () {
                 return new Mirage.Response(404, {'Content-Type': 'application/json'}, {errors: [{message: 'User not found.', errorType: 'NotFoundError'}]});
             });
@@ -602,6 +815,44 @@ describe('Acceptance: Team', function () {
                 errorReset();
                 expect(currentPath()).to.equal('error404');
                 expect(currentURL()).to.equal('/team/unknown');
+            });
+        });
+    });
+
+    describe('when logged in as author', function () {
+        let author, authorRole, adminRole;
+
+        beforeEach(function () {
+            adminRole = server.create('role', {name: 'Administrator'});
+            authorRole = server.create('role', {name: 'Author'});
+            author = server.create('user', {roles: [authorRole]});
+
+            server.loadFixtures();
+
+            server.get('/invites/', function () {
+                return new Mirage.Response(403, {}, {
+                    errors: [{
+                        errorType: 'NoPermissionError',
+                        message: 'You do not have permission to perform this action'
+                    }]
+                });
+            });
+
+            return authenticateSession(application);
+        });
+
+        it('can access the team page', function () {
+            let user1 = server.create('user', {roles: [adminRole]});
+            let invite1 = server.create('invite', {roles: [authorRole]});
+
+            errorOverride();
+
+            visit('/team');
+
+            andThen(() => {
+                errorReset();
+                expect(currentPath()).to.equal('team.index');
+                expect(find('.gh-alert').length).to.equal(0);
             });
         });
     });
